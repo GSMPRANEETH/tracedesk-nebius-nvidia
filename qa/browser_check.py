@@ -45,6 +45,13 @@ async def main():
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 await page.goto(URL)
                 await page.locator("#connection").filter(has_text="NEBIUS_API_KEY").wait_for()
+                token = (await (await page.request.get(URL + "/api/context")).json())["csrf_token"]
+                protected = {"Origin": URL, "X-TraceDesk-Token": token}
+                assert (await page.request.post(URL + "/api/clear", data={}, headers={"Origin":"https://example.invalid","X-TraceDesk-Token":token})).status == 403
+                assert (await page.request.post(URL + "/api/clear", data={}, headers={"Origin":URL})).status == 403
+                assert (await page.request.get(URL + "/api/context", headers={"Host":"example.invalid"})).status == 403
+                assert (await page.request.get(URL + "/unknown-file")).status == 404
+                assert (await page.request.post(URL + "/api/answer", data={"question":"x" * 13000}, headers=protected)).status == 413
                 assert await page.locator(".source").count() == 8
                 assert "Awaiting" in await page.locator("#answer-state").inner_text()
                 captures = []
