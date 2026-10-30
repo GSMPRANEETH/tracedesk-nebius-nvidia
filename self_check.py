@@ -4,8 +4,10 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
+import subprocess
 import tempfile
 import threading
+import time
 from unittest.mock import patch
 
 from tracedesk.core import Store, answer, load_runbook, validate_response
@@ -63,6 +65,15 @@ class ProviderFixture(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
+        if mode == "slow-drip":
+            try:
+                for octet in raw:
+                    self.wfile.write(bytes([octet]))
+                    self.wfile.flush()
+                    time.sleep(.02)  # Each byte arrives well inside urllib's 25-second idle timeout.
+            except (BrokenPipeError, ConnectionResetError):
+                self.server.disconnected.set()
+            return
         self.wfile.write(raw)
 
 
@@ -102,6 +113,31 @@ def transport_checks(payload):
             provider.mode, provider.received = "transient", []
             assert answer("Port?", "RelayGate", "2.0", [])["status"] == "answer"
             assert len(provider.received) == 2
+            provider.mode, provider.received = "slow-drip", []
+            provider.disconnected = threading.Event()
+            processes = []
+            real_popen = subprocess.Popen
+            def capture_process(*args, **kwargs):
+                assert Path(args[0][1]).is_absolute() and args[0][-1] == "--provider-worker"
+                assert Path(kwargs["cwd"]).resolve() == Path(__file__).resolve().parent
+                assert not any("fixture-key" in str(arg) for arg in args[0])
+                process = real_popen(*args, **kwargs)
+                processes.append(process)
+                return process
+            started = time.monotonic()
+            with patch("tracedesk.core.PROVIDER_DEADLINE_SECONDS", .6), \
+                    patch("tracedesk.core.subprocess.Popen", side_effect=capture_process):
+                try:
+                    answer("Port?", "RelayGate", "2.0", [])
+                except RuntimeError as exc:
+                    assert "total request deadline" in str(exc)
+                    assert "fixture-key" not in str(exc)
+                else:
+                    raise AssertionError("A continuously dripping body must not escape the overall deadline")
+            assert time.monotonic() - started < 3, "The worker exceeded the bounded local-test deadline"
+            assert len(processes) == 1 and processes[0].poll() is not None, "Timed-out worker must be killed and reaped"
+            assert len(provider.received) == 1, "Retries must not continue beyond the total budget"
+            assert provider.disconnected.wait(1), "Killed worker must close its active provider connection"
             provider.mode = "success"
             provider.response = dict(choices=[dict(message=dict(content=json.dumps({
                 **payload, "evidence_quotes": [{"passage_id": "rg2-port", "quote": "Fabricated fixture evidence"}]})))])
@@ -194,7 +230,18 @@ def main():
         rejects(lambda: answer("Port?", "RelayGate", "3.0", []))
         rejects(lambda: answer("Port?", "RelayGate", "2.0", [], use_memory="false"))
         with patch.dict("os.environ", {"NEBIUS_API_KEY": ""}):
-            rejects(lambda: answer("Port?", "RelayGate", "2.0", []), RuntimeError)
+            with patch("tracedesk.core.subprocess.run") as worker:
+                rejects(lambda: answer("Port?", "RelayGate", "2.0", []), RuntimeError)
+                worker.assert_not_called()
+        with patch.dict("os.environ", {"NEBIUS_API_KEY": "fixture-key-not-real"}), \
+                patch("tracedesk.core.subprocess.run", return_value=subprocess.CompletedProcess(
+                    [], 1, stdout=b"fixture-private-marker", stderr=b"fixture-private-marker")):
+            try:
+                answer("Port?", "RelayGate", "2.0", [])
+            except RuntimeError as exc:
+                assert "fixture-private-marker" not in str(exc) and "fixture-key" not in str(exc)
+            else:
+                raise AssertionError("Unexpected worker failure must be sanitized")
         store.clear()
         assert not Store(path).list("RelayGate", "2.0")
         for i in range(19):
@@ -211,7 +258,7 @@ def main():
         store.save("RelayGate", "2.0", "saved 0", quote, ["rg2-port"], True)
         assert len(store.list("RelayGate", "2.0")) == 20
     transport_checks(payload)
-    print("PASS: offline exact quotes/scope, approval/persistence/concurrency, and local HTTP transport/auth/retry/redirect/error checks. Live Nebius NOT RUN.")
+    print("PASS: offline quote/scope/storage checks and local HTTP auth/retry/redirect/errors/slow-drip deadline with worker termination. Live Nebius NOT RUN.")
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ This is an engineering checklist, not legal clearance. The current deliverable i
 ## Verified locally
 
 - Core scope/approval/citation/exact-quote/persistence/error checks pass, including concurrent correction-cap enforcement. Local HTTP transport tests cover credential headers, bounded retries, redirect refusal, and sanitized failures; they are not live-model evaluation.
+- Linux and native Windows Python pass the provider-worker regression: slow-drip responses cannot evade the 55-second communication budget; timeout kills and reaps the worker. Process creation/cleanup overhead and provider-side charges are outside that guarantee.
 - Browser checks pass at 1440, 768, and 390 pixels: no horizontal overflow; source version change; reviewed save/reload/delete; invalid quote rejection; honest missing-runtime error.
 - Host, same-origin, CSRF, explicit static-file routes, text rendering, input bounds, connection timeout, and serialized inference are implemented.
 - Browser asset requests are same-origin; system fonts; no analytics/replay/email/payment SDKs in this app.
@@ -17,7 +18,7 @@ This is an engineering checklist, not legal clearance. The current deliverable i
 - [ ] Confirm Nebius sign-in, credit balance, selected NVIDIA model access, JSON-mode behavior, and a real successful inference request.
 - [ ] Run development evaluation, freeze decisions, run held-out evaluation, and manually check factual support/abstention. Keep failures visible.
 - [ ] Verify clean setup on another machine and judge access through **23 December 2026**. A transient credit balance is not an availability commitment.
-- [ ] Publish the source repository with a visible license and stable revision; release only this project's allowlisted files.
+- [x] Publish the source repository with a visible license and stable revision; release only this project's allowlisted files. Public v0.2.0 is verified; later fixes must be packaged and rechecked before a new release.
 - [ ] Record a public YouTube video under three minutes showing actual model execution, not a UI fixture or screenshot montage.
 - [ ] Finish the Devpost description, tools/integration explanation, demo/test-build URL, and observed provider feedback.
 - [ ] Submit before the official deadline and preserve the confirmation. A local build, public repo, or draft form is not a submitted entry.

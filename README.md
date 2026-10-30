@@ -22,7 +22,7 @@ To enable actual inference without writing a key to disk or command history:
 python3 -m tracedesk.server --prompt-key
 ```
 
-Enter your Nebius API key at the hidden terminal prompt. It is kept in that process's environment, never sent to the browser or saved to the correction database. Alternatively, set `NEBIUS_API_KEY` in your process environment. The `.env.example` documents variable names; the app does not automatically load `.env` files.
+Enter your Nebius API key at the hidden terminal prompt. It stays in the server environment and is inherited by one short-lived provider worker; it is never placed in command arguments, sent to the browser, or saved to the correction database. Alternatively, set `NEBIUS_API_KEY` in your process environment. The `.env.example` documents variable names; the app does not automatically load `.env` files.
 
 Default model: `nvidia/Nemotron-3_5-Lightning`. Confirm exact current availability in your Nebius account. Set `NEBIUS_MODEL` to another accessible NVIDIA model identifier if needed. The app uses the [official OpenAI-compatible endpoint](https://docs.tokenfactory.nebius.com/quickstart), `https://api.tokenfactory.nebius.com/v1/chat/completions`. JSON-mode support and access need a real request; a configured key alone is not a connectivity pass.
 
@@ -52,7 +52,7 @@ flowchart LR
     UI -->|explicit review + source quote| DB
 ```
 
-One Python process; standard-library HTTP, SQLite, and HTTPS client; browser-native HTML/CSS/JavaScript. No framework, vector database, agent runtime, analytics, remote font, or cloud database. The four Python passages are original, short summaries of public official documentation, with upstream URLs and review dates. The sixteen RelayGate passages are synthetic. No employer/customer material or private inbox content is included.
+One Python server with a short-lived isolated inference worker; standard-library HTTP, SQLite, subprocess, and HTTPS client; browser-native HTML/CSS/JavaScript. No framework, vector database, agent runtime, analytics, remote font, or cloud database. The four Python passages are original, short summaries of public official documentation, with upstream URLs and review dates. The sixteen RelayGate passages are synthetic. No employer/customer material or private inbox content is included.
 
 ## Real example and evidence provenance
 
@@ -73,7 +73,7 @@ python3 self_check.py
 python3 -m compileall -q tracedesk evaluate.py
 ```
 
-The assert-based check covers scope isolation, authentic/missing/fabricated quotes, invalid citations, approval, unsupported corrections, idempotent saves, persistence, concurrent cap enforcement, malformed provider responses, and missing-key errors. It also makes actual requests to a local test HTTP provider to check payload/auth headers, retries, redirect blocking, and sanitized failures. Those are explicit transport fixtures and **do not measure model accuracy or prove a live Nebius integration**.
+The assert-based check covers scope isolation, authentic/missing/fabricated quotes, invalid citations, approval, unsupported corrections, idempotent saves, persistence, concurrent cap enforcement, malformed provider responses, and missing-key errors. It also makes actual requests to a local test HTTP provider to check payload/auth headers, retries, redirect blocking, sanitized failures, and a continuously dripping response that must time out with its worker killed/reaped. This suite passed on Linux and native Windows Python. Those are explicit transport fixtures and **do not measure model accuracy or prove a live Nebius integration**.
 
 Optional browser QA runs in a disposable environment; Playwright is not a production dependency:
 
@@ -102,7 +102,7 @@ The phrase/citation checks are **heuristics requiring human semantic review**. T
 - API secrets remain server-side. Access logging is suppressed; no browser tracking/cookies/third-party assets are used by this code.
 - Questions: 2 KB UTF-8; runbook: 20 passages / 30 KB; approved memories: 20 per version. Full scoped context is sent; ranked retrieval is an upgrade only if this grows.
 - Corrections are durable in `.local/corrections.sqlite3`; “Clear all memory” deletes local rows. That action makes no claim about provider retention.
-- One paid request runs at a time; a request retries once for transient provider failure. This does not establish a monthly spending cap. Use provider-side account limits and credits.
+- One paid request runs at a time; a request retries once for transient provider failure. A supervised provider worker has a 55-second communication budget covering both attempts and slow streamed responses. Timeout kills and reaps that worker, closing its connection; native process creation/cleanup overhead is additional. Provider-side processing/charges may already have occurred. This does not establish a monthly spending cap. Use provider-side account limits and credits.
 - Valid citation IDs and exact excerpts prove scoped quote authenticity, not that every generated sentence follows from them. Sources and questions are untrusted; no tools or autonomous actions are available.
 
 Read [the release checklist](docs/RELEASE-CHECKLIST.md) and [submission materials](docs/SUBMISSION.md). MIT license applies to this source code and authored synthetic samples; NVIDIA/model/provider terms remain separate.

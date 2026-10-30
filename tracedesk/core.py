@@ -7,6 +7,8 @@ from pathlib import Path
 import re
 import socket
 import sqlite3
+import subprocess
+import sys
 import time
 from contextlib import closing
 from urllib import error, request
@@ -15,6 +17,7 @@ from urllib import error, request
 RUNBOOK = Path(__file__).resolve().parents[1] / "data" / "runbook.json"
 DEFAULT_MODEL = "nvidia/Nemotron-3_5-Lightning"
 API_URL = "https://api.tokenfactory.nebius.com/v1/chat/completions"
+PROVIDER_DEADLINE_SECONDS = 55
 
 
 def load_runbook():
@@ -176,7 +179,7 @@ class _NoRedirect(request.HTTPRedirectHandler):
         return None  # Never forward a provider credential to a redirect target.
 
 
-def _infer(messages, model):
+def _request(messages, model, api_url):
     key = os.environ.get("NEBIUS_API_KEY", "").strip()
     if not key:
         raise RuntimeError("Nebius inference is not configured. Set NEBIUS_API_KEY on the server.")
@@ -184,7 +187,7 @@ def _infer(messages, model):
                            max_tokens=1400, response_format={"type": "json_object"})).encode("utf-8")
     opener = request.build_opener(_NoRedirect)
     for attempt in range(2):
-        req = request.Request(API_URL, data=data, headers={
+        req = request.Request(api_url, data=data, headers={
             "Authorization": f"Bearer {key}", "Content-Type": "application/json",
         })
         try:
@@ -212,6 +215,52 @@ def _infer(messages, model):
             raise RuntimeError("Nebius could not be reached within the request deadline.") from None
         except (json.JSONDecodeError, UnicodeDecodeError, HTTPException):
             raise RuntimeError("Nebius returned an unreadable response; no answer was generated.") from None
+
+
+def _infer(messages, model):
+    if not os.environ.get("NEBIUS_API_KEY", "").strip():
+        raise RuntimeError("Nebius inference is not configured. Set NEBIUS_API_KEY on the server.")
+    # urllib's timeout is an idle timeout. A killable process also bounds slow-drip bodies and both retries.
+    # Ponytail: OS process creation/reaping adds overhead outside this budget; a supervised pool can reduce launch cost.
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()), "--provider-worker"],
+            input=json.dumps(dict(messages=messages, model=model, api_url=API_URL)).encode(),
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            cwd=RUNBOOK.parent.parent, timeout=PROVIDER_DEADLINE_SECONDS, check=False,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Nebius exceeded the total request deadline; its worker was stopped.") from None
+    except OSError:
+        raise RuntimeError("The isolated inference worker could not start.") from None
+    try:
+        if completed.returncode or len(completed.stdout) > 1_100_000:
+            raise ValueError("Invalid worker output")
+        result = json.loads(completed.stdout)
+        if not isinstance(result, dict) or set(result) not in ({"response"}, {"error"}):
+            raise ValueError("Invalid worker envelope")
+        if "error" in result:
+            if not isinstance(result["error"], str):
+                raise ValueError("Invalid worker error")
+            raise RuntimeError(result["error"])
+        return result["response"]
+    except (ValueError, UnicodeError):
+        raise RuntimeError("The inference worker returned an unreadable response.") from None
+
+
+def _provider_worker():
+    """Private JSON stdio boundary; URL comes from this module's caller, never browser input."""
+    try:
+        config = json.loads(sys.stdin.buffer.read())
+        result = {"response": _request(config["messages"], config["model"], config["api_url"])}
+    except RuntimeError as exc:
+        result = {"error": str(exc)}  # _request emits fixed messages and numeric HTTP status only.
+    except Exception:
+        result = {"error": "The isolated inference worker failed; no answer was generated."}
+    raw = json.dumps(result, ensure_ascii=False).encode("utf-8")
+    if len(raw) > 1_100_000:
+        raw = b'{"error":"The inference worker response exceeded the size limit."}'
+    sys.stdout.buffer.write(raw)
 
 
 def answer(question, product, version, corrections, use_memory=True):
@@ -279,3 +328,9 @@ def answer(question, product, version, corrections, use_memory=True):
         return result
     except (KeyError, IndexError, TypeError, json.JSONDecodeError, ValueError):
         raise RuntimeError("The model response failed evidence/format validation; no supported answer is shown.") from None
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] != ["--provider-worker"]:
+        raise SystemExit(2)
+    _provider_worker()
