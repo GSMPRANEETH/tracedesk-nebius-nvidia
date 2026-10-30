@@ -2,8 +2,10 @@
 
 **Status: preparation only.** Copy only claims supported by the final functioning build. Replace runtime-pending wording only after a real verification. No public video or Devpost submission exists yet.
 
-**Name:** TraceDesk  
-**Tagline:** Technical support answers with a source, a scope, and a human review.  
+**Name:** TraceDesk
+
+**Tagline:** Technical support answers with a source, a scope, and a human review.
+
 **Track:** Best Apps and Agents.
 
 ## Inspiration
