@@ -52,21 +52,42 @@ async def main():
                 assert (await page.request.get(URL + "/api/context", headers={"Host":"example.invalid"})).status == 403
                 assert (await page.request.get(URL + "/unknown-file")).status == 404
                 assert (await page.request.post(URL + "/api/answer", data={"question":"x" * 13000}, headers=protected)).status == 413
-                assert await page.locator(".source").count() == 8
+                assert await page.locator("#product").input_value() == "Python queues"
+                assert await page.locator(".source").count() == 2
                 assert "Awaiting" in await page.locator("#answer-state").inner_text()
                 captures = []
                 for width, height in [(1440,1000),(768,1024),(390,844)]:
                     await page.set_viewport_size({"width":width,"height":height})
                     await page.screenshot(path=ARTIFACTS / f"tracedesk-{width}.png", full_page=True)
                     assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth"), f"Overflow at {width}"
-                    captures.append({"viewport":f"{width}x{height}","artifact":f"tracedesk-{width}.png","observation":"Real local server, eight scoped sources, honest missing-key banner; no generated answer; no horizontal overflow."})
+                    captures.append({"viewport":f"{width}x{height}","artifact":f"tracedesk-{width}.png","observation":"Real local server, two official-Python-derived scoped summaries with provenance links, honest missing-key banner; no generated answer; no horizontal overflow."})
                 await page.set_viewport_size({"width":1440,"height":1000})
                 # Keyboard focus and accessible form names.
                 await page.locator("#question").focus()
                 assert await page.locator("#question").evaluate("el=>el===document.activeElement")
                 assert await page.get_by_role("button", name="Find an answer").count() == 1
-                for selector in ["#question", "#version", "#review-source", "#review-question", "#review-text"]:
+                for selector in ["#question", "#product", "#version", "#review-source", "#review-question", "#review-text"]:
                     assert await page.locator(selector).evaluate("el=>el.labels.length>0"), selector
+                # Real, deterministic public-document migration workflow (no model request).
+                await page.locator("#nav-compare").click()
+                assert await page.locator(".comparison-item").count() == 2
+                assert "3.13" == await page.locator("#compare-to").input_value()
+                assert "immediate=True" in await page.locator("#comparison-list").inner_text()
+                async with page.expect_download() as download_info:
+                    await page.locator("#export-comparison").click()
+                download = await download_info.value
+                export_path = Path(temporary) / "comparison.md"
+                await download.save_as(export_path)
+                exported = export_path.read_text()
+                assert "py312-shutdown" in exported and "py313-shutdown" in exported
+                assert "https://docs.python.org/3.13/library/queue.html" in exported
+                await page.screenshot(path=ARTIFACTS / "tracedesk-version-lens.png", full_page=True)
+                await page.get_by_role("button", name="Ask about this change").first.click()
+                assert await page.locator("#product").input_value() == "Python queues"
+                assert await page.locator("#version").input_value() == "3.13"
+                assert "queue shutdown" in await page.locator("#question").input_value()
+                await page.locator("#product").select_option("RelayGate")
+                assert await page.locator(".source").count() == 8
                 # Real correction save/persistence/version switch/deletion path.
                 await page.locator("#review-question").fill("Which listener port applies?")
                 await page.locator("#approved").check()
@@ -75,6 +96,7 @@ async def main():
                 assert await page.locator("#memory-count").inner_text() == "1"
                 await page.reload()
                 await page.locator("#memory-count").filter(has_text="1").wait_for()
+                await page.locator("#product").select_option("RelayGate")
                 await page.locator("#version").select_option("2.0")
                 assert "rg2-" in await page.locator("#sources").inner_text()
                 assert "rg1-" not in await page.locator("#sources").inner_text()
@@ -100,12 +122,14 @@ async def main():
                 await page.unroute("**/api/answer", delayed)
                 # Explicit UI-only fixtures verify rendering/escaping, never count as model eval.
                 async def fixture(route):
-                    await route.fulfill(json={"status":"answer","answer":"UI TEST FIXTURE — not NVIDIA output. <script>alert('xss')</script>","citations":["rg2-port"],"used_correction_ids":[],"provider":"UI fixture only","model":"test-transport","latency_ms":0,"usage":{"total_tokens":0}})
+                    await route.fulfill(json={"status":"answer","answer":"UI TEST FIXTURE — not NVIDIA output. <script>alert('xss')</script>","citations":["rg2-port"],"evidence_quotes":[{"passage_id":"rg2-port","quote":"RelayGate 2.0 listens on TCP port 9090 by default."}],"evidence_validation":"exact-source-quotes","used_correction_ids":[],"provider":"UI fixture only","model":"test-transport","latency_ms":0,"usage":{"total_tokens":0}})
                 await page.route("**/api/answer", fixture)
                 await page.locator("#ask").click()
                 await page.locator("#answer-state").filter(has_text="Evidence-linked answer").wait_for()
                 assert "<script>" in await page.locator("#answer-body").inner_text()
                 assert await page.locator("#answer-body script").count() == 0
+                assert await page.locator("#verified-quotes blockquote").count() == 1
+                assert "9090" in await page.locator("#verified-quotes").inner_text()
                 await page.get_by_role("button", name="↗ rg2-port").click()
                 assert await page.locator("#source-rg2-port").get_attribute("open") is not None
                 await page.unroute("**/api/answer", fixture)
@@ -121,7 +145,7 @@ async def main():
                 assert not errors, errors
                 evidence = {"contract":"Local single-operator technical-support workbench; primary question action, scoped sources and reviewed memory; system fonts and same-origin assets.",
                     "targetViewports":["1440x1000","768x1024","390x844"], "renderedEvidence":captures,
-                    "accessibility":{"status":"pass","evidence":"Explicit labels checked for five inputs; keyboard focus and role-based answer action exercised; all answers/sources rendered as text; visible focus CSS. This is a focused check, not a full WCAG or screen-reader audit."},
+                    "accessibility":{"status":"pass","evidence":"Explicit labels checked for six workbench inputs; keyboard focus and role-based answer action exercised; all answers/sources rendered as text; visible focus CSS. This is a focused check, not a full WCAG or screen-reader audit."},
                     "responsive":{"status":"pass","evidence":"All three real viewport captures have no horizontal overflow; source and review sections stack below 800px."},
                     "contentStates":{
                         "loading":{"status":"pass","evidence":"Delayed transport showed waiting text, disabled answer action, and stable answer area."},
@@ -130,7 +154,7 @@ async def main():
                         "partial":{"status":"pass","evidence":"Without an API key, real source browsing and local correction save remain functional while inference is explicitly unavailable."},
                         "success":{"status":"pass","evidence":"Real approved memory save persisted across reload; clear removed it. Answer rendering separately tested with an explicitly labeled UI-only transport fixture, not real inference."},
                         "permission":{"status":"pass","evidence":"Missing server credential is disclosed; no client key form or secret appears. Provider authorization itself remains untested without a key."}},
-                    "consoleErrors":errors,"realInference":"not-run: no key","visualRegression":"inconclusive: initial baseline only","performance":"not a representative Core Web Vitals measurement","fixtureDisclosure":"One labeled response rendering fixture; never a model benchmark or demo claim."}
+                    "consoleErrors":errors,"versionLens":"Two real-doc topics compared, Markdown download checked, target-version question handoff verified; no inference used.","realInference":"not-run: no key","visualRegression":"inconclusive: new product surface baseline","performance":"not a representative Core Web Vitals measurement","fixtureDisclosure":"One labeled response rendering fixture; never a model benchmark or demo claim."}
                 (ARTIFACTS / "qa-evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
                 await browser.close()
                 print("PASS: responsive layout, source scopes, labels/focus, real memory save/reload/clear, invalid excerpt, honest missing-key error, and UI-only answer rendering. Live inference NOT RUN.")

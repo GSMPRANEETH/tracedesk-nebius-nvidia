@@ -10,19 +10,19 @@
 
 ## Inspiration
 
-Support answers often depend on the product version. Repeating a plausible fix from the wrong release can be worse than admitting that the documentation is incomplete. We wanted a small workbench where evidence and reviewed decisions remain inspectable.
+Support answers often depend on the product version. In Python queues, `join()` normally tracks completed work, while immediate shutdown can bypass that completion expectation. A plausible generic answer can therefore be wrong for the user's actual mode/release. We built a workbench where versions, source evidence, exact excerpts, and reviewed decisions stay inspectable.
 
-This is a product hypothesis illustrated with fictional data, not a claim based on customer interviews or measured support-team savings.
+The Python case is documented upstream and has a runnable local reproduction; the separate RelayGate example is fictional. Support-team value remains a hypothesis, without customer interviews or measured time savings.
 
 ## What it does
 
-TraceDesk selects a version-specific runbook, asks an NVIDIA model through Nebius Token Factory for a structured response, and validates passage IDs before displaying a supported answer. The prompt requests abstention when the runbook does not contain an answer. An operator can approve a source excerpt and save it to local SQLite memory. The next request can include those reviewed excerpts within the exact product/version scope.
+TraceDesk selects version-specific documentation, asks an NVIDIA model through Nebius Token Factory for a structured response, and requires authentic excerpts for every citation. Its Version lens compares supplied passages from two releases and downloads a Markdown brief without making a model call. Source links let the user check original context. The prompt requests abstention when evidence is absent. An operator can approve a source excerpt and save it to SQLite; later requests may include that memory only within the exact product/version scope.
 
-The app currently demonstrates reviewed source prioritization. It does not train the model or add facts beyond its evidence. Citation validation is structural; semantic support requires evaluation.
+The app demonstrates reviewed source prioritization, not model training. Quote validation proves exact passage membership; it cannot prove every generated assertion follows from the excerpt. Semantic evaluation remains required.
 
 ## How it is built
 
-Python standard-library HTTP, SQLite, and urllib; browser-native HTML/CSS/JavaScript; hosted NVIDIA inference on Nebius Token Factory. No vector database or orchestration framework. API key stays server-side. Synthetic RelayGate 1.0/2.0 runbooks make version-sensitive behavior reproducible without using private data.
+Python standard-library HTTP, SQLite, and urllib; browser-native HTML/CSS/JavaScript; an NVIDIA inference integration for Nebius Token Factory. No vector database or orchestration framework. API key stays server-side and provider redirects are refused to avoid forwarding credentials. Original summaries of official Python 3.12/3.13 queue documentation and synthetic RelayGate 1.0/2.0 runbooks provide reproducible version-sensitive cases without private data. Actual provider execution remains pending account access.
 
 ## Challenges and lessons
 
@@ -30,7 +30,7 @@ A small prototype still needs trust boundaries: scope validation, unsupported ci
 
 ## What is verified
 
-Local invariant checks and browser workflows pass. Live provider execution and semantic evaluation remain pending until account credentials are available. Do not remove this disclosure or call the project a functioning AI demo until those gates pass.
+Local invariant, HTTP transport, and browser workflows pass. A local Python 3.14.4 reproduction observed immediate shutdown returning from `join()` without processing the queued job; this demonstrates the developer problem, not Nebius execution. The 24-case synthetic/public-document evaluation is prepared. Live provider execution and semantic evaluation remain pending account access. Do not remove this disclosure or call the project a functioning AI demo until those gates pass.
 
 ## Next steps
 
@@ -44,11 +44,11 @@ Python, SQLite, JavaScript, HTML, CSS, NVIDIA Nemotron, Nebius Token Factory. On
 
 | Time | Show | Narration purpose |
 |---|---|---|
-| 0:00–0:20 | Workbench and two runbook versions | Explain a concrete wrong-version support risk |
-| 0:20–0:55 | Real answer and source passage | Show actual NVIDIA-on-Nebius output and runtime metadata |
+| 0:00–0:20 | Python version lens and local queue reproduction | Explain a concrete completion-accounting support risk |
+| 0:20–0:55 | Actual model answer, exact excerpt, upstream source | Show genuine NVIDIA-on-Nebius output and runtime metadata |
 | 0:55–1:20 | Unsupported pricing question | Show observed abstention, or honestly report a failure |
 | 1:20–1:55 | Review an excerpt, save, reload, rerun | Demonstrate persistence/scope; no weight-update claim |
 | 1:55–2:25 | Actual evaluation result and version switch | Give real sample count, failures, and observed effect |
-| 2:25–2:45 | Architecture and limitations | State remote inference, synthetic scope, and next step |
+| 2:25–2:45 | Architecture and limitations | State remote inference, curated public/synthetic scope, and next step |
 
 Do not use a transport-test fixture in the video. A recording of the missing-key screen may document build status but does not meet a working-AI demonstration requirement. Do not invent provider feedback, a model score, or a demo URL.

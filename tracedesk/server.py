@@ -96,8 +96,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(404, {"error": "Not found"})
         except (ValueError, TypeError, UnicodeError) as exc:
             return self.send(400, {"error": str(exc)[:240]})
-        except RuntimeError:
-            return self.send(503, {"error": "Nebius inference is unavailable. Check the API key, model access, and credit balance. No generated answer was substituted."})
+        except RuntimeError as exc:
+            # Core errors are sanitized at the provider boundary; preserve the actual recovery reason.
+            return self.send(503, {"error": f"{exc} No generated answer was substituted."})
         except Exception:
             return self.send(500, {"error": "The request failed. Your saved evidence has not been replaced."})
 

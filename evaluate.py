@@ -37,14 +37,18 @@ def main():
     report = {"created_at": datetime.now(timezone.utc).isoformat(), "split": args.split,
         "source_sha256": hashlib.sha256((ROOT / "data" / "runbook.json").read_bytes()).hexdigest(),
         "model": os.environ.get("NEBIUS_MODEL", "nvidia/Nemotron-3_5-Lightning"),
-        "method": "Same bounded runbook; memory-on adds two preapproved source excerpts. No weight updates.",
-        "limitations": ["20 synthetic cases are not a reliability benchmark", "Keyword checks require human semantic review", "Provider errors count as failures, not abstentions"],
+        "method": "Same bounded scoped runbook; memory-on adds approved matching-scope source excerpts where present. Two RelayGate authentication excerpts are seeded; public-docs scopes have no seeded memory. No weight updates.",
+        "case_count": len(cases), "source_passage_count": len(sources),
+        "response_contract": "Every citation has a byte-bounded exact quote from its scoped source; authentic quotes do not prove entailment.",
+        "limitations": ["A small synthetic/public-docs suite is not a reliability benchmark", "Authentic quotes and keyword checks require human semantic review", "Provider errors count as failures, not abstentions"],
         "manual_review_required": True, "results": []}
     args.out.parent.mkdir(parents=True, exist_ok=True)
     for case in cases:
         for memory in modes:
             try:
-                result = answer(case["question"], "RelayGate", case["version"], store.list("RelayGate", case["version"]), memory)
+                product = case.get("product", "RelayGate")
+                scoped_memory = store.list(product, case["version"])
+                result = answer(case["question"], product, case["version"], scoped_memory, memory)
                 # Ponytail: keyword/citation heuristics flag regressions only; upgrade to independent human entailment scoring before accuracy claims.
                 failures = []
                 if result["status"] != case["status"]:
@@ -54,9 +58,13 @@ def main():
                 text = result["answer"].casefold()
                 failures.extend(f"missing phrase: {word}" for word in case["contains"] if word.casefold() not in text)
                 failures.extend(f"forbidden phrase: {word}" for word in case["forbidden"] if word.casefold() in text)
-                row = dict(case_id=case["id"], memory=memory, result=result, heuristic_pass=not failures, flags=failures, semantic_review="pending")
+                row = dict(case_id=case["id"], product=product, version=case["version"], memory=memory,
+                           available_memory_count=len(scoped_memory) if memory else 0, result=result,
+                           evidence_validation=result["evidence_validation"],
+                           heuristic_pass=not failures, flags=failures, semantic_review="pending")
             except RuntimeError as error:
-                row = dict(case_id=case["id"], memory=memory, provider_error=str(error), heuristic_pass=False, semantic_review="not-run")
+                row = dict(case_id=case["id"], memory=memory, provider_error=str(error),
+                           evidence_validation="not-completed", heuristic_pass=False, semantic_review="not-run")
             report["results"].append(row)
             report["heuristic_passes"] = sum(r["heuristic_pass"] for r in report["results"])
             report["attempts"] = len(report["results"])

@@ -1,14 +1,15 @@
 # Release checklist — 30 October 2026
 
-This is an engineering checklist, not legal clearance. The current deliverable is source for a **local, single-operator synthetic-data demo**, not a hosted multi-user service.
+This is an engineering checklist, not legal clearance. The current deliverable is source for a **local, single-operator public/synthetic-document demo**, not a hosted multi-user service.
 
 ## Verified locally
 
-- Core scope/approval/citation/persistence/error checks pass, including concurrent correction-cap enforcement.
+- Core scope/approval/citation/exact-quote/persistence/error checks pass, including concurrent correction-cap enforcement. Local HTTP transport tests cover credential headers, bounded retries, redirect refusal, and sanitized failures; they are not live-model evaluation.
 - Browser checks pass at 1440, 768, and 390 pixels: no horizontal overflow; source version change; reviewed save/reload/delete; invalid quote rejection; honest missing-runtime error.
 - Host, same-origin, CSRF, explicit static-file routes, text rendering, input bounds, connection timeout, and serialized inference are implemented.
 - Browser asset requests are same-origin; system fonts; no analytics/replay/email/payment SDKs in this app.
-- Inputs are authored synthetic passages. No private email, employer record, credential, or organizer dataset belongs in a release.
+- The version-lens comparison, Markdown download, and target-version question handoff work on original summaries of official Python documentation. A queue reproduction actually runs on the local Python interpreter without inference.
+- Inputs are original public-document summaries plus authored synthetic passages, with source provenance. No private email, employer record, credential, or organizer dataset belongs in a release.
 
 ## Remaining gates before an eligible competition entry
 

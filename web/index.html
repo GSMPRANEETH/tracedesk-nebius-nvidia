@@ -11,9 +11,10 @@
 <div class="shell">
   <aside class="sidebar" aria-label="Workspace navigation">
     <a class="brand" href="/" aria-label="TraceDesk home"><span class="brand-mark" aria-hidden="true">t<span>·</span></span> TraceDesk</a>
-    <div class="workspace"><span class="avatar">RG</span><div>RelayGate lab<small>Synthetic support workspace</small></div></div>
+    <div class="workspace"><span class="avatar">TD</span><div>Documentation lab<small>Version-aware support workspace</small></div></div>
     <p class="nav-label">WORKSPACE</p>
     <button class="nav active" id="nav-workbench" aria-current="page"><span aria-hidden="true">↗</span> Answer workbench</button>
+    <button class="nav" id="nav-compare"><span aria-hidden="true">⇄</span> Version lens</button>
     <button class="nav" id="nav-memory"><span aria-hidden="true">⌘</span> Reviewed memory <span id="memory-count" class="count">0</span></button>
     <div class="sidebar-note"><span class="small-dot" aria-hidden="true"></span> A smaller, safer learning loop<p>Evidence → human review → memory.</p><p>Model weights stay unchanged.</p></div>
     <div class="sidebar-footer"><span class="local-dot" aria-hidden="true"></span> Local workspace <small>Single operator · no telemetry</small></div>
@@ -24,7 +25,7 @@
       <div class="heading-row"><div><p class="eyebrow">EVIDENCE BEFORE CONFIDENCE</p><h1>Good answers leave a trace.</h1><p class="intro">Resolve a support question. Inspect the source. Keep what you’ve reviewed.</p></div><span class="build-label">01 / RESEARCH DEMO</span></div>
       <div id="connection" class="connection" role="status">Checking local runtime…</div>
       <section id="workbench" aria-label="Answer workbench">
-        <div class="toolbar"><div><label for="version">Product version</label><select id="version"></select></div><label class="switch"><input type="checkbox" id="use-memory" checked><span>Use reviewed memory</span></label><span class="source-summary" id="source-summary"></span></div>
+        <div class="toolbar"><div><label for="product">Documentation</label><select id="product"></select></div><div><label for="version">Version</label><select id="version"></select></div><label class="switch"><input type="checkbox" id="use-memory" checked><span>Use reviewed memory</span></label><span class="source-summary" id="source-summary"></span></div>
         <div class="work-grid">
           <section class="question-pane" aria-labelledby="question-heading">
             <div class="section-heading"><span class="step">01</span><h2 id="question-heading">Ask the runbook</h2></div>
@@ -33,15 +34,16 @@
             <section id="answer-section" aria-labelledby="answer-heading" class="answer-section" aria-live="polite" aria-busy="false">
               <div class="answer-label"><h3 id="answer-heading">Response</h3><span id="answer-state" class="badge neutral">Awaiting question</span></div>
               <div id="answer-body" class="empty-answer"><div class="evidence-glyph" aria-hidden="true">↳</div><h3>A source, not a guess.</h3><p>Your answer, citations, and runtime trace will appear here. Missing evidence stays visible.</p></div>
-              <div id="citations" class="citations"></div><div id="runtime" class="runtime" hidden></div>
+              <div id="citations" class="citations"></div><div id="verified-quotes" class="verified-quotes"></div><div id="runtime" class="runtime" hidden></div>
             </section>
           </section>
-          <aside class="evidence-pane" aria-labelledby="evidence-heading"><div class="section-heading"><span class="step">02</span><h2 id="evidence-heading">Source evidence</h2><span id="evidence-count" class="subtle"></span></div><p class="pane-intro">A fictional runbook, with stable passage IDs. Select a passage to review or save an excerpt.</p><div id="sources" class="sources"></div></aside>
+          <aside class="evidence-pane" aria-labelledby="evidence-heading"><div class="section-heading"><span class="step">02</span><h2 id="evidence-heading">Source evidence</h2><span id="evidence-count" class="subtle"></span></div><p class="pane-intro" id="source-provenance">Curated documentation with stable passage IDs. Review the source behind each excerpt.</p><div id="sources" class="sources"></div></aside>
         </div>
         <section class="review-section" aria-labelledby="review-heading"><div><p class="eyebrow">THE LEARNING LOOP</p><h2 id="review-heading">Make the next answer more useful.</h2><p>Save an exact source excerpt after review. Memory stays within this product version.</p></div><form id="review-form"><div class="review-fields"><div><label for="review-source">Evidence passage</label><select id="review-source" required></select></div><div><label for="review-question">Question this helps answer</label><input id="review-question" maxlength="2000" required placeholder="For example: how should timeout retries work?"></div></div><label for="review-text">Reviewed excerpt</label><textarea id="review-text" rows="3" maxlength="4000" required></textarea><label class="check-label"><input type="checkbox" id="approved" required> I reviewed this excerpt against its source and selected version.</label><div class="review-footer"><span id="review-status" role="status"></span><button class="secondary" type="submit" id="save-correction">Save reviewed memory <span aria-hidden="true">+</span></button></div></form></section>
       </section>
+      <section id="compare-view" hidden aria-labelledby="compare-heading"><div class="memory-heading"><div><p class="eyebrow">VERSION LENS</p><h2 id="compare-heading">The right answer depends on the release.</h2><p>Compare curated source passages directly. This view makes no model calls.</p></div><button class="secondary" id="export-comparison">Download comparison ↓</button></div><div class="compare-toolbar"><div><label for="compare-product">Documentation</label><select id="compare-product"></select></div><div><label for="compare-from">From</label><select id="compare-from"></select></div><div><label for="compare-to">To</label><select id="compare-to"></select></div></div><p id="comparison-summary" role="status"></p><div id="comparison-list"></div></section>
       <section id="memory-view" hidden aria-labelledby="memory-heading"><div class="memory-heading"><div><h2 id="memory-heading">Reviewed memory</h2><p>Approved source excerpts in this local operator workspace.</p></div><button class="danger" id="clear-memory">Clear all memory</button></div><div id="memory-list"></div><p id="memory-status" role="status"></p></section>
-      <footer class="page-footer"><span>TraceDesk <span class="footer-dash">—</span> human-reviewed memory, NVIDIA inference.</span><span>Synthetic data only <span aria-hidden="true">·</span> No autonomous actions</span></footer>
+      <footer class="page-footer"><span>TraceDesk <span class="footer-dash">—</span> human-reviewed memory, NVIDIA inference.</span><span>Public docs + synthetic examples <span aria-hidden="true">·</span> No autonomous actions</span></footer>
     </main>
   </div>
 </div>
